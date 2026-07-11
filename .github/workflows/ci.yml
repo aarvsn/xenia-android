@@ -1,0 +1,158 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "main", "master", "dev" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NDK_VERSION: 26.1.10909125
+  JAVA_VERSION: '17'
+
+jobs:
+  build:
+    name: Build APK (${{ matrix.build_type }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [debug, release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Clone xenia upstream directly — avoids submodule index registration issues.
+      # A shallow clone keeps CI fast (~50 MB vs ~500 MB for full history).
+      - name: Clone xenia-upstream
+        run: |
+          git clone \
+            --depth 1 \
+            --branch master \
+            --single-branch \
+            https://github.com/xenia-project/xenia.git \
+            xenia-upstream
+          echo "xenia-upstream: $(git -C xenia-upstream rev-parse HEAD)"
+
+      - name: Symlink src/ and third_party/
+        run: bash setup.sh
+
+      - name: Verify source tree
+        run: |
+          ls src/xenia/
+          ls third_party/ | head -10
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK and CMake
+        run: |
+          sdkmanager \
+            "ndk;${{ env.NDK_VERSION }}" \
+            "cmake;3.22.1" \
+            --sdk_root="$ANDROID_SDK_ROOT" \
+            --channel=0
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
+
+      - name: Verify Gradle wrapper
+        run: |
+          test -f gradlew                          || { echo "ERROR: gradlew missing";            exit 1; }
+          test -f gradle/wrapper/gradle-wrapper.jar || { echo "ERROR: gradle-wrapper.jar missing"; exit 1; }
+          chmod +x gradlew
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', '**/*.gradle') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Cache NDK build
+        uses: actions/cache@v4
+        with:
+          path: app/.cxx
+          key: ndk-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('app/src/main/cpp/**') }}
+          restore-keys: ndk-${{ runner.os }}-${{ matrix.build_type }}-
+
+      - name: Build ${{ matrix.build_type }} APK
+        run: |
+          TASK="assemble$(echo ${{ matrix.build_type }} | sed 's/\b./\u&/')"
+          ./gradlew "$TASK" --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: xenia-android-${{ matrix.build_type }}-${{ github.sha }}
+          path: app/build/outputs/apk/${{ matrix.build_type }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload release symbols
+        if: matrix.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xenia-android-symbols-${{ github.sha }}
+          path: app/build/intermediates/merged_native_libs/release/
+          retention-days: 14
+        continue-on-error: true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Stub src/ and third_party/ for lint
+        run: mkdir -p src/xenia third_party
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches
+          key: gradle-lint-${{ runner.os }}-${{ hashFiles('**/*.gradle') }}
+
+      - name: Run lint
+        run: |
+          chmod +x gradlew
+          ./gradlew lintDebug --no-daemon --stacktrace
+
+      - name: Upload lint report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          retention-days: 7
+          if-no-files-found: warn
