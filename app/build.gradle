@@ -1,0 +1,110 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.xenia.android'
+    compileSdk 34
+
+    // Pin the exact NDK version. AGP 8.2+ warns if ndkVersion is absent
+    // when externalNativeBuild is configured.
+    ndkVersion '26.1.10909125'
+
+    defaultConfig {
+        applicationId 'com.xenia.android'
+        // API 24 = Android 7.0, minimum for Vulkan 1.0
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0-alpha"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                // C++17, exceptions and RTTI required by Xenia
+                cppFlags "-std=c++17 -frtti -fexceptions"
+                // STL: static c++ runtime so we don't ship libc++_shared.so
+                arguments(
+                    "-DANDROID_STL=c++_static",
+                    "-DANDROID_PLATFORM=android-24",
+                    "-DANDROID_ARM_NEON=TRUE",
+                    "-DXENIA_BUILD_ANDROID=ON"
+                )
+            }
+        }
+
+        ndk {
+            // arm64-v8a: phones/tablets. x86_64: Android emulator / dev boxes.
+            // 32-bit ABIs are unsupported — Xenia's JIT requires 64-bit address space.
+            abiFilters 'arm64-v8a', 'x86_64'
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+            debuggable true
+            jniDebuggable true
+            externalNativeBuild {
+                cmake {
+                    arguments "-DCMAKE_BUILD_TYPE=Debug"
+                }
+            }
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles(
+                getDefaultProguardFile('proguard-android-optimize.txt'),
+                'proguard-rules.pro'
+            )
+            externalNativeBuild {
+                cmake {
+                    arguments "-DCMAKE_BUILD_TYPE=Release"
+                }
+            }
+            // Use debug signing in CI; replace with a proper keystore for distribution
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            // AGP 8.x requires an explicit CMake version
+            version "3.22.1"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+
+    packaging {
+        jniLibs {
+            // Keep native debug symbols in the APK for crash reporting
+            keepDebugSymbols += ['**/*.so']
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.preference:preference:1.2.1'
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}

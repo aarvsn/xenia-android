@@ -1,0 +1,36 @@
+# Gradle build outputs
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Android Studio
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+app/.cxx/
+
+# Signing keys — never commit
+*.jks
+*.keystore
+keystore.properties
+
+# OS
+Thumbs.db
+.DS_Store
+
+# NOTE: The Gradle wrapper (gradlew, gradlew.bat, gradle/wrapper/*)
+# is intentionally committed and must NOT be in .gitignore.
+# Do NOT add gradle/wrapper/gradle-wrapper.jar here.
+
+# Xenia source (managed as a submodule — not committed directly)
+# src/ and third_party/ are symlinks created by setup.sh; ignore them
+# only if they end up as real directories (shouldn't happen normally)
+/src/
+/third_party/
