@@ -1,4 +1,4 @@
-# Gradle / Android build outputs
+# Gradle build outputs
 .gradle/
 build/
 local.properties
@@ -7,28 +7,29 @@ local.properties
 *.ap_
 *.dex
 
-# Android Studio project files
+# Android Studio
 .idea/
 *.iml
 .DS_Store
 captures/
 .externalNativeBuild/
 .cxx/
-
-# NDK / CMake generated files
 app/.cxx/
-app/src/main/cpp/.externalNativeBuild/
 
-# Keys / signing
+# Signing keys — never commit
 *.jks
 *.keystore
 keystore.properties
 
-# OS metadata
+# OS
 Thumbs.db
 .DS_Store
 
-# Xenia upstream (vendor separately)
-xenia-upstream/
-src/xenia/
-third_party/
+# NOTE: The Gradle wrapper (gradlew, gradlew.bat, gradle/wrapper/*)
+# is intentionally committed and must NOT be in .gitignore.
+# Do NOT add gradle/wrapper/gradle-wrapper.jar here.
+
+# Xenia source (managed as a submodule — not committed directly)
+# src/ and third_party/ are symlinks created by setup.sh; ignore them
+/src
+/third_party

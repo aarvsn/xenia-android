@@ -1,4 +1,4 @@
-// Copyright 2024 Xenia Android Contributors. All rights reserved.
+// Copyright 2026 Xenia Android Contributors. All rights reserved.
 // Released under the BSD license - see LICENSE in the root for more details.
 
 #ifndef XENIA_ANDROID_JNI_XENIA_JNI_UTILS_H_

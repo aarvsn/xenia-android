@@ -1,32 +1,49 @@
 #!/usr/bin/env bash
-# setup.sh — Symlink the xenia-upstream submodule's src/ and third_party/
-# directories into the repo root so CMake can find them without copying.
+# setup.sh — Symlink src/ and third_party/ from xenia-upstream into the repo root.
 #
-# Run once after `git clone --recurse-submodules`.
+# xenia-upstream can be present either as:
+#   a) A git submodule:  git submodule update --init --depth 1 xenia-upstream
+#   b) A direct clone:   git clone --depth 1 https://github.com/xenia-project/xenia.git xenia-upstream
 
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-UPSTREAM="${SCRIPT_DIR}/xenia-upstream"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UPSTREAM="${REPO}/xenia-upstream"
 
-if [[ ! -d "$UPSTREAM/src" ]]; then
-  echo "ERROR: xenia-upstream submodule not initialised."
-  echo "Run: git submodule update --init --recursive"
-  exit 1
+if [[ ! -d "${UPSTREAM}/src" ]]; then
+  echo "xenia-upstream not found. Cloning..."
+  git clone --depth 1 --branch master \
+    https://github.com/xenia-project/xenia.git \
+    "${UPSTREAM}"
 fi
 
-# Create symlinks if they don't exist yet.
+echo "Initializing submodules inside xenia-upstream..."
+git -C "${UPSTREAM}" submodule update --init --recursive --depth 1
+
+if [[ -d "${REPO}/patches" ]]; then
+  echo "Applying custom xenia-upstream patches..."
+  cp "${REPO}/patches/base/"* "${UPSTREAM}/src/xenia/base/"
+  cp "${REPO}/patches/ui/"* "${UPSTREAM}/src/xenia/ui/"
+fi
+
 for target in src third_party; do
-  link="${SCRIPT_DIR}/${target}"
-  if [[ -L "$link" ]]; then
-    echo "  symlink already exists: $target -> xenia-upstream/$target"
-  elif [[ -e "$link" ]]; then
-    echo "  WARNING: $link already exists as a non-symlink, skipping"
+  link="${REPO}/${target}"
+  src="xenia-upstream/${target}"
+  if [[ -L "${link}" ]]; then
+    # If the symlink is absolute, recreate it as relative
+    current_target=$(readlink "${link}")
+    if [[ "${current_target}" == /* ]]; then
+      rm "${link}"
+      ln -s "${src}" "${link}"
+      echo "  re-linked as relative: ${target}"
+    else
+      echo "  already linked: ${target}"
+    fi
+  elif [[ -e "${link}" ]]; then
+    echo "  WARNING: ${link} exists as real path, skipping"
   else
-    ln -s "${UPSTREAM}/${target}" "${link}"
-    echo "  created symlink: $target -> xenia-upstream/$target"
+    ln -s "${src}" "${link}"
+    echo "  linked: ${target}"
   fi
 done
 
-echo ""
-echo "Setup complete. You can now open the project in Android Studio or run:"
-echo "  ./gradlew assembleDebug"
+echo "Done. Run: ./gradlew assembleDebug"
