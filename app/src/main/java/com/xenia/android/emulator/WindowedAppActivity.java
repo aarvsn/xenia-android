@@ -31,7 +31,7 @@ public abstract class WindowedAppActivity extends Activity {
      * arguments. The literal value is also referenced from native code.
      */
     public static final String EXTRA_CVARS =
-            "com.xenia.android.emulator.WindowedAppActivity.EXTRA_CVARS";
+            "jp.xenia.emulator.WindowedAppActivity.EXTRA_CVARS";
 
     static {
         System.loadLibrary("xenia-android");
